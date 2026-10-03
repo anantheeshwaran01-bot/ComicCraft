@@ -1,4 +1,6 @@
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -24,60 +26,32 @@ app = FastAPI(
 settings.ensure_directories()
 
 
-# ============================================================
-# STATIC FILE DIRECTORIES
-# ============================================================
+# Make sure all required directories exist
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Project structure:
-#
-# comiccraft/
-#
-# ├── app/
-# │
-# ├── static/
-# │   └── css/
-# │       └── style.css
-# │
-# ├── templates/
-# │   ├── index.html
-# │   ├── comic_preview.html
-# │   └── export_success.html
-# │
-# └── output/
-#     ├── panels/
-#     │   ├── panel_1_xxxxx.png
-#     │   ├── panel_2_xxxxx.png
-#     │   └── ...
-#     │
-#     └── exports/
-#         └── comic.pdf
-#
-#
-# URL mapping:
-#
-# /static/css/style.css
-#       ↓
-# static/css/style.css
-#
-# /static/panels/panel_1.png
-#       ↓
-# output/panels/panel_1.png
-#
-# /static/exports/comic.pdf
-#       ↓
-# output/exports/comic.pdf
+STATIC_DIR = PROJECT_ROOT / "static"
+CSS_DIR = STATIC_DIR / "css"
+
+OUTPUT_DIR = PROJECT_ROOT / "output"
+PANELS_DIR = OUTPUT_DIR / "panels"
+EXPORTS_DIR = OUTPUT_DIR / "exports"
+
+
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+CSS_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+PANELS_DIR.mkdir(parents=True, exist_ok=True)
+EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ============================================================
-# CSS
+# STATIC CSS
 # ============================================================
 
 app.mount(
     "/static/css",
     StaticFiles(
-        directory=str(
-            settings.static_dir / "css"
-        )
+        directory=str(CSS_DIR)
     ),
     name="css",
 )
@@ -90,9 +64,7 @@ app.mount(
 app.mount(
     "/static/panels",
     StaticFiles(
-        directory=str(
-            settings.panels_dir
-        )
+        directory=str(PANELS_DIR)
     ),
     name="panels",
 )
@@ -105,19 +77,38 @@ app.mount(
 app.mount(
     "/static/exports",
     StaticFiles(
-        directory=str(
-            settings.exports_dir
-        )
+        directory=str(EXPORTS_DIR)
     ),
     name="exports",
 )
 
 
 # ============================================================
-# API / HTML ROUTES
+# APPLICATION ROUTES
 # ============================================================
 
 app.include_router(router)
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/health")
+async def health():
+
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "panels": settings.panels,
+        "image_provider": settings.image_provider,
+        "gemini_configured": bool(
+            settings.gemini_api_key
+        ),
+        "huggingface_configured": bool(
+            settings.hf_token
+        ),
+    }
 
 
 # ============================================================
@@ -130,6 +121,7 @@ async def root():
     return {
         "name": settings.app_name,
         "status": "running",
+        "message": "ComicCraft AI Comic Generator is running.",
         "panels": settings.panels,
         "image_provider": settings.image_provider,
     }
